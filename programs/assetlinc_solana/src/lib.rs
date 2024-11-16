@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
-use solana_program::program::invoke;
-use solana_program::system_instruction;
+use anchor_lang::solana_program::program::invoke;
 use anchor_lang::solana_program::system_instruction;
 
-// Program ID - Replace with your own program ID after deployment
+// Program ID
 declare_id!("H73K8LsRbV1jkcJkK3hQM2Z7TC4T1864Gwm3WtF3bAay");
 
 // Constants for fees and periods

@@ -14,7 +14,7 @@ const MONTHLY_PERIOD: i64 = 30 * 24 * 60 * 60; // 30 days in seconds
 const TRIAL_PERIOD: i64 = 14 * 24 * 60 * 60; // 14 days in seconds
 
 #[program]
-pub mod subscription_service {
+pub mod subscription {
     use super::*;
 
     // Manage subscription
@@ -28,8 +28,8 @@ pub mod subscription_service {
 
         // Determine the fee based on subscription tier
         let tier_fee = match subscription_tier {
-            0 => BASIC_FEE,    // Basic
-            1 => PREMIUM_FEE,  // Premium
+            0 => BASIC_FEE,      // Basic
+            1 => PREMIUM_FEE,    // Premium
             2 => ENTERPRISE_FEE, // Enterprise
             _ => return Err(ErrorCode::InvalidSubscriptionTier.into()),
         };
@@ -49,15 +49,8 @@ pub mod subscription_service {
         let fee_receiver = &ctx.accounts.fee_receiver;
 
         invoke(
-            &system_instruction::transfer(
-                user.key,
-                fee_receiver.key,
-                tier_fee,
-            ),
-            &[
-                user.to_account_info(),
-                fee_receiver.to_account_info(),
-            ],
+            &system_instruction::transfer(user.key, fee_receiver.key, tier_fee),
+            &[user.to_account_info(), fee_receiver.to_account_info()],
         )?;
 
         // Update subscription details
@@ -79,15 +72,8 @@ pub mod subscription_service {
         let fee_receiver = &ctx.accounts.fee_receiver;
 
         invoke(
-            &system_instruction::transfer(
-                user.key,
-                fee_receiver.key,
-                royalty_fee,
-            ),
-            &[
-                user.to_account_info(),
-                fee_receiver.to_account_info(),
-            ],
+            &system_instruction::transfer(user.key, fee_receiver.key, royalty_fee),
+            &[user.to_account_info(), fee_receiver.to_account_info()],
         )?;
 
         // Register the NFT
@@ -115,7 +101,13 @@ pub mod subscription_service {
 
 #[derive(Accounts)]
 pub struct ManageSubscription<'info> {
-    #[account(mut)]
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + UserData::INIT_SPACE,
+        seeds = [b"user-data", user.key().as_ref()],
+        bump
+    )]
     pub user_data: Account<'info, UserData>,
     #[account(mut)]
     pub user: Signer<'info>,
@@ -126,10 +118,17 @@ pub struct ManageSubscription<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(asset_name: String, asset_value: u64)]
 pub struct RegisterAsset<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-    #[account(init, payer = user, space = 8 + 64)]
+    #[account(
+        init,
+        payer = user,
+        space = 8 + NftData::INIT_SPACE,
+        seeds = [b"nft-data", user.key().as_ref(), asset_name.as_ref()],
+        bump
+    )]
     pub nft_data: Account<'info, NftData>,
     /// CHECK: Verified during transfer
     #[account(mut)]
@@ -144,13 +143,16 @@ pub struct CheckSubscription<'info> {
 
 // Data structures
 #[account]
+#[derive(InitSpace)]
 pub struct UserData {
     pub subscription_tier: u8,
     pub last_payment: i64,
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct NftData {
+    #[max_len(64)]
     pub name: String,
     pub value: u64,
     pub owner: Pubkey,
